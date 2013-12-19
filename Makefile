@@ -7,14 +7,6 @@
 # The line is constructed and tested for using BASH as shell.
 MY_OWN_KEY=$(shell gpg --list-secret-keys | grep -e "^sec " | awk '{print $2}' | sed -e 's/.*\/\(.*\) .*/\1/g')
 
-ifeq ($(strip $(MY_OWN_KEY)),)
-$(error Couldn't find the private key that is needed to be able to sign other keys)	
-endif
-
-ifeq ($(strip ${GPGKEYTOSIGN}),)
-$(error Environment variable GPGKEYTOSIGN isn't set (export GPGKEYTOSIGN=AABBCCDD))
-endif
-
 help:
 	@echo "     MY_OWN_KEY=$(MY_OWN_KEY)"
 	@echo " 1.  export GNUPGHOME=/home/jbech/tmp/.gnupg"
@@ -27,18 +19,28 @@ help:
 	@echo "     or (ask key owner before uploading his/hers key)"
 	@echo " 6b. make upload    (gpg --keyserver pgp.mit.edu --send-key ${GPGKEYTOSIGN})"
 
-get_key:
+get_key: check_key_to_sign
 	gpg --keyserver pgp.mit.edu --recv-keys ${GPGKEYTOSIGN}
 
-check_fpr:
+check_fpr: check_key_to_sign
 	gpg --fingerprint ${GPGKEYTOSIGN}
 
-sign:
+sign: check_key_to_sign
 	gpg --sign-key ${GPGKEYTOSIGN}
 
-export:
+export: check_own_key check_key_to_sign
 	gpg --armor --output ${GPGKEYTOSIGN}-signedBy-$(MY_OWN_KEY).asc --export ${GPGKEYTOSIGN}
 
-upload:
+upload: check_key_to_sign
 	gpg --keyserver pgp.mit.edu --send-key ${GPGKEYTOSIGN}
 
+check_own_key:
+ifeq ($(strip $(MY_OWN_KEY)),)
+	$(info Could not find the private key that is needed to be able to sign other keys)
+	$(error Forgot to: export GPGKEYTOSIGN=AABBCCDD?)
+endif
+
+check_key_to_sign:
+ifeq ($(strip $(GPGKEYTOSIGN)),)
+	$(error Environment variable GPGKEYTOSIGN hasn't been set (export GPGKEYTOSIGN=AABBCCDD))
+endif
